@@ -310,7 +310,7 @@ public:
    * @param size Length of the data to be read
    * @return Output the number of bytes
    */
-  //virtual size_t write(const uint8_t *pBuf, size_t size);
+  virtual size_t write(const uint8_t *pBuf, size_t size);
   //using Print::write; /*!< pull in write(str) and write(buf, size) from Print */
   //operator bool() { return true; }
 

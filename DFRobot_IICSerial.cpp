@@ -2,6 +2,7 @@
 #include "I2Cdev.h"
 #include <stdio.h>
 #include <cstring>
+#include <unistd.h>
 
 #define DEBUG 0
 
@@ -116,7 +117,7 @@ size_t DFRobot_IICSerial::write(uint8_t value){
   return 1;
 }
 
-/*size_t DFRobot_IICSerial::write(const uint8_t *pBuf, size_t size){
+size_t DFRobot_IICSerial::write(const uint8_t *pBuf, size_t size){
   if(pBuf == NULL){
     printf("pBuf ERROR!! : null pointer");
     return 0;
@@ -132,7 +133,7 @@ size_t DFRobot_IICSerial::write(uint8_t value){
   writeFIFO(_pBuf, size);
   return size;
 }
-*/
+
 
 size_t DFRobot_IICSerial::read(void *pBuf, size_t size){
   if(pBuf == NULL){
@@ -384,7 +385,7 @@ uint8_t DFRobot_IICSerial::readFIFO(void* pBuf, size_t size){
   return (uint8_t)size;
 }
 
-/*
+
 void DFRobot_IICSerial::writeFIFO(void *pBuf, size_t size){
   if(pBuf == NULL){
       printf("pBuf ERROR!! : null pointer");
@@ -398,16 +399,15 @@ void DFRobot_IICSerial::writeFIFO(void *pBuf, size_t size){
   while(left){
     size = (left > IIC_BUFFER_SIZE) ? IIC_BUFFER_SIZE: left;
     
-    _pWire->beginTransmission(_addr);
-    _pWire->write(_pBuf, size);
-    if(_pWire->endTransmission() != 0){
-        return;
+    //Hack to bypass the register writting in I2Cdev.cpp, no register to be written here.
+    if(size > 1){
+      _i2cdev->writeBytes(_addr, _pBuf[0], size-1, _pBuf+1);
+    } else {
+      _i2cdev->writeBytes(_addr, _pBuf[0], size-1, 0);
     }
     
-    _i2cdev->writeBytes(_addr, reg, size, pBuf);
-    delay(10);
+    usleep(10*1000);
     left -= size;
     _pBuf = _pBuf + size;
   }
 }
-*/
