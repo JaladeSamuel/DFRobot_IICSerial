@@ -1,19 +1,20 @@
-/*!
- * @file DFRobot_IICSerial.h
- * @brief Define the basic structure of class DFRobot_IICSerial
- *
- * @copyright   Copyright (c) 2010 DFRobot Co.Ltd (http://www.dfrobot.com)
- * @licence     The MIT License (MIT)
- * @author [Arya](xue.peng@dfrobot.com)
- * @version  V1.0
- * @date  2019-07-28
- * @https://github.com/DFRobot/DFRobot_IICSerial
- */
-#include <Arduino.h>
-#include <DFRobot_IICSerial.h>
+#include "DFRobot_IICSerial.h"
+#include "I2Cdev.h"
+#include <stdio.h>
+#include <cstring>
 
-DFRobot_IICSerial::DFRobot_IICSerial(TwoWire &wire,  uint8_t subUartChannel, uint8_t IA1, uint8_t IA0){
-  _pWire = &wire;
+#define DEBUG 0
+
+#if DEBUG
+ #define _DEBUG 
+#else
+ #define _DEBUG for(;0;)
+#endif
+
+
+
+DFRobot_IICSerial::DFRobot_IICSerial(I2Cdev &i2cdev,  uint8_t subUartChannel, uint8_t IA1, uint8_t IA0){
+  _i2cdev = &i2cdev;
   _addr = (IA1 << 6) | (IA0 << 5) | IIC_ADDR_FIXED;
   _subSerialChannel = subUartChannel;
   _rx_buffer_head = 0;
@@ -27,24 +28,18 @@ DFRobot_IICSerial::~DFRobot_IICSerial(){
 
 int DFRobot_IICSerial::begin(long unsigned baud, uint8_t format, eCommunicationMode_t mode, eLineBreakOutput_t opt){
   _rx_buffer_head = _rx_buffer_tail;
-  _pWire->begin();
+  //_pWire->begin();
   uint8_t val = 0;
   uint8_t channel = subSerialChnnlSwitch(SUBUART_CHANNEL_1);
   if(readReg(REG_WK2132_GENA, &val, 1) != 1){
-      DBG("READ BYTEERROR!");
+      printf("READ BYTEERROR!\n");
       return ERR_READ;
   }
-#ifndef ARDUINO_ARCH_NRF5
-  if((val & 0x80) == 0){
-      DBG("Read REG_WK2132_GENA  ERROR!");
-      return ERR_REGDATA;
-  }
-#endif
   subSerialChnnlSwitch(channel);
   subSerialConfig(_subSerialChannel);
-  DBG("OK");
   setSubSerialBaudRate(baud);
   setSubSerialConfigReg(format, mode, opt);
+  printf("DFRobot_IICSerial init OK\n");
   return ERR_OK;
 }
 
@@ -57,7 +52,7 @@ int DFRobot_IICSerial::available(void){
   uint8_t val = 0;
   sFsrReg_t fsr;
   if(readReg(REG_WK2132_RFCNT, &val, 1) != 1){
-      DBG("READ BYTE SIZE ERROR!");
+      printf("READ BYTE SIZE ERROR!\n");
       return 0;
   }
   index = (int)val;
@@ -114,16 +109,16 @@ size_t DFRobot_IICSerial::write(uint8_t value){
   sFsrReg_t fsr;
   fsr = readFIFOStateReg();
   if(fsr.tFull == 1){
-      DBG("FIFO full!");
+      printf("FIFO full!\n");
       return -1;
   }
   writeReg(REG_WK2132_FDAT, &value, 1);
   return 1;
 }
 
-size_t DFRobot_IICSerial::write(const uint8_t *pBuf, size_t size){
+/*size_t DFRobot_IICSerial::write(const uint8_t *pBuf, size_t size){
   if(pBuf == NULL){
-    DBG("pBuf ERROR!! : null pointer");
+    printf("pBuf ERROR!! : null pointer");
     return 0;
   }
   uint8_t *_pBuf = (uint8_t *)pBuf;
@@ -131,16 +126,17 @@ size_t DFRobot_IICSerial::write(const uint8_t *pBuf, size_t size){
   uint8_t val = 0;
   fsr = readFIFOStateReg();
   if(fsr.tFull == 1){
-      DBG("FIFO full!");
+      printf("FIFO full!");
       return 0;
   }
   writeFIFO(_pBuf, size);
   return size;
 }
+*/
 
 size_t DFRobot_IICSerial::read(void *pBuf, size_t size){
   if(pBuf == NULL){
-    DBG("pBuf ERROR!! : null pointer");
+    printf("pBuf ERROR!! : null pointer\n");
     return 0;
   }
   uint8_t *_pBuf = (uint8_t *)pBuf;
@@ -155,21 +151,21 @@ void DFRobot_IICSerial::flush(void){
 
 
 void DFRobot_IICSerial::subSerialConfig(uint8_t subUartChannel){
-  DBG("Sub UART clock enable");
+  _DEBUG printf("Sub UART clock enable\n");
   subSerialGlobalRegEnable(subUartChannel, clock);
-  DBG("Software reset sub UART");
+  _DEBUG printf("Software reset sub UART\n");
   subSerialGlobalRegEnable(subUartChannel, rst);
-  DBG("Sub UART global interrupt enable");
+  _DEBUG printf("Sub UART global interrupt enable\n");
   subSerialGlobalRegEnable(subUartChannel, intrpt);
-  DBG("Sub UART page register setting (default PAGE0)");
+  _DEBUG printf("Sub UART page register setting (default PAGE0)\n");
   subSerialPageSwitch(page0);
-  DBG("Sub interrupt setting");
+  _DEBUG printf("Sub interrupt setting\n");
   sSierReg_t sier = {.rFTrig = 0x01, .rxOvt = 0x01, .tfTrig = 0x01, .tFEmpty = 0x01, .rsv = 0x00, .fErr = 0x01};
   subSerialRegConfig(REG_WK2132_SIER, &sier);
-  DBG("enable transmit/receive FIFO");
+  _DEBUG printf("enable transmit/receive FIFO\n");
   sFcrReg_t fcr = {.rfRst = 0x01, .tfRst = 0x00, .rfEn = 0x01, .tfEn = 0x01, .rfTrig = 0x00, .tfTrig = 0x00};
   subSerialRegConfig(REG_WK2132_FCR, &fcr);
-  DBG("Sub UART reiceive/transmit enable");
+  _DEBUG printf("Sub UART reiceive/transmit enable\n");
   sScrReg_t scr = {.rxEn = 0x01, .txEn = 0x01, .sleepEn = 0x00, .rsv = 0x00 };
   subSerialRegConfig(REG_WK2132_SCR, &scr);
 }
@@ -177,18 +173,20 @@ void DFRobot_IICSerial::subSerialConfig(uint8_t subUartChannel){
 void DFRobot_IICSerial::subSerialGlobalRegEnable(uint8_t subUartChannel, eGlobalRegType_t type){
   if(subUartChannel > SUBUART_CHANNEL_ALL)
   {
-      DBG("SUBSERIAL CHANNEL NUMBER ERROR!");
+      printf("SUBSERIAL CHANNEL NUMBER ERROR!");
       return;
   }
   uint8_t val = 0;
   uint8_t regAddr = getGlobalRegType(type);
   uint8_t channel = subSerialChnnlSwitch(SUBUART_CHANNEL_1);
-  DBG("reg");DBG(regAddr, HEX);
+  _DEBUG printf("reg");
+  _DEBUG printf("%02x\n", regAddr);
   if(readReg(regAddr, &val, 1) != 1){
-        DBG("READ BYTE SIZE ERROR!");
+        printf("READ BYTE SIZE ERROR!\n");
       return;
   }
-  DBG("before:");DBG(val, HEX);
+  _DEBUG printf("before:");
+  _DEBUG printf("%02x\n", val);
   switch(subUartChannel){
       case SUBUART_CHANNEL_1:
                              val |= 0x01;
@@ -202,7 +200,8 @@ void DFRobot_IICSerial::subSerialGlobalRegEnable(uint8_t subUartChannel, eGlobal
   }
   writeReg(regAddr, &val, 1);
   readReg(regAddr, &val, 1);
-  DBG("after:");DBG(val, HEX);
+  _DEBUG printf("after:");
+  _DEBUG printf("%02x\n", val);
   subSerialChnnlSwitch(channel);
 }
 
@@ -212,7 +211,7 @@ void DFRobot_IICSerial::subSerialPageSwitch(ePageNumber_t page){
   }
   uint8_t val = 0;
   if(readReg(REG_WK2132_SPAGE, &val, 1) != 1){
-      DBG("READ BYTE SIZE ERROR!");
+      printf("READ BYTE SIZE ERROR!");
       return;
   }
   switch(page){
@@ -225,25 +224,29 @@ void DFRobot_IICSerial::subSerialPageSwitch(ePageNumber_t page){
       default:
               break;
   }
-  DBG("before: "); DBG(val);
+  _DEBUG printf("before: "); 
+  _DEBUG printf("%02x\n", val);
   writeReg(REG_WK2132_SPAGE, &val, 1);
   readReg(REG_WK2132_SPAGE, &val, 1);
-  DBG("after: ");DBG(val, HEX);
+  _DEBUG printf("after: ");
+  _DEBUG printf("%02x\n", val);
 }
 
 void DFRobot_IICSerial::subSerialRegConfig(uint8_t reg, void *pValue){
   uint8_t val = 0;
   readReg(reg, &val, 1);
-  DBG("before: "); DBG(val);
+  _DEBUG printf("before: "); 
+  _DEBUG printf("%02x\n", val);
   val |= *(uint8_t *)pValue;
   writeReg(reg, &val, 1);
   readReg(reg, &val, 1);
-  DBG("after: ");DBG(val, HEX);
+  _DEBUG printf("after: ");
+  _DEBUG printf("%02x\n", val);
 }
 
 uint8_t DFRobot_IICSerial::getGlobalRegType(eGlobalRegType_t type){
   if((type < clock) || (type > intrpt)){
-      DBG("Global Reg Type Error!");
+      printf("Global Reg Type Error!");
       return 0;
   }
   uint8_t regAddr = 0;
@@ -282,9 +285,9 @@ void DFRobot_IICSerial::setSubSerialBaudRate(unsigned long baud){
   readReg(REG_WK2132_BAUD1, &baud1, 1);
   readReg(REG_WK2132_BAUD0, &baud0, 1);
   readReg(REG_WK2132_PRES, &baudPres, 1);
-  DBG(baud1, HEX);
-  DBG(baud0, HEX);
-  DBG(baudPres, HEX);
+  _DEBUG printf("baud1 %02x \n", baud1);
+  _DEBUG printf("baud0 %02x \n", baud0);
+  _DEBUG printf("baudPres %02x \n", baudPres);
   subSerialPageSwitch(page0);
   subSerialRegConfig(REG_WK2132_SCR, &scr);
 }
@@ -295,10 +298,11 @@ void DFRobot_IICSerial::setSubSerialConfigReg(uint8_t format, eCommunicationMode
   uint8_t val = 0;
   _addr = updateAddr(_addr, _subSerialChannel, OBJECT_REGISTER);
   if(readReg(REG_WK2132_LCR, &val, 1) != 1){
-      DBG("Read Byte ERROR！");
+      printf("Read Byte ERROR！");
       return;
   }
-  DBG("before: "); DBG(val, HEX);
+  _DEBUG printf("before: "); 
+  _DEBUG printf("%02x\n", val);
   sLcrReg_t lcr = *((sLcrReg_t *)(&val));
   lcr.format = format;
   lcr.irEn = _mode;
@@ -306,7 +310,8 @@ void DFRobot_IICSerial::setSubSerialConfigReg(uint8_t format, eCommunicationMode
   val = *(uint8_t *)&lcr;
   writeReg(REG_WK2132_LCR, &val, 1);
   readReg(REG_WK2132_LCR, &val, 1);
-  DBG("after: "); DBG(val, HEX);
+  _DEBUG printf("after: "); 
+  _DEBUG printf("%02x\n", val);
 }
 
 uint8_t DFRobot_IICSerial::updateAddr(uint8_t pre, uint8_t subUartChannel, uint8_t obj){
@@ -325,6 +330,7 @@ uint8_t DFRobot_IICSerial::subSerialChnnlSwitch(uint8_t subUartChannel){
   _subSerialChannel = subUartChannel;
   return channel;
 }
+
 void DFRobot_IICSerial::sleep(){
   
 }
@@ -332,81 +338,76 @@ void DFRobot_IICSerial::sleep(){
 void DFRobot_IICSerial::wakeup(){
 
 }
+
 void DFRobot_IICSerial::writeReg(uint8_t reg, const void* pBuf, size_t size){
   if(pBuf == NULL){
-      DBG("pBuf ERROR!! : null pointer");
+      printf("pBuf ERROR!! : null pointer");
   }
+
   _addr = updateAddr(_addr, _subSerialChannel, OBJECT_REGISTER);
   uint8_t * _pBuf = (uint8_t *)pBuf;
-  _pWire->beginTransmission(_addr);
-  _pWire->write(&reg, 1);
 
-  for(uint16_t i = 0; i < size; i++){
-    _pWire->write(_pBuf[i]);
-  }
-  _pWire->endTransmission();
+  _i2cdev->writeBytes(_addr, reg, size, _pBuf);
 }
 
 uint8_t DFRobot_IICSerial::readReg(uint8_t reg, void* pBuf, size_t size){
   if(pBuf == NULL){
-    DBG("pBuf ERROR!! : null pointer");
+    printf("pBuf ERROR!! : null pointer");
     return 0;
   }
+
   _addr = updateAddr(_addr, _subSerialChannel, OBJECT_REGISTER);
   uint8_t * _pBuf = (uint8_t *)pBuf;
   _addr &= 0xFE;
-  _pWire->beginTransmission(_addr);
-  _pWire->write(&reg, 1);
-  if(_pWire->endTransmission() != 0){
-      return 0;
-  }
-  _pWire->requestFrom(_addr, (uint8_t) size);
-  for(uint16_t i = 0; i < size; i++){
-    _pBuf[i] = (char)_pWire->read();
-  }
+
+  _i2cdev->readBytes(_addr, reg, size, _pBuf);
   return size;
 }
 
 uint8_t DFRobot_IICSerial::readFIFO(void* pBuf, size_t size){
   if(pBuf == NULL){
-    DBG("pBuf ERROR!! : null pointer");
+    printf("pBuf ERROR!! : null pointer");
     return 0;
   }
+
   _addr = updateAddr(_addr, _subSerialChannel, OBJECT_FIFO);
   uint8_t *_pBuf = (uint8_t *)pBuf;
   size_t left = size,num = 0;
+
   while(left){
-      num = (left > IIC_BUFFER_SIZE) ?  IIC_BUFFER_SIZE : left;
-      _pWire->beginTransmission(_addr);
-      if(_pWire->endTransmission() != 0){
-          return 0;
-      }
-      _pWire->requestFrom(_addr, (uint8_t) num);
-      for(size_t i = 0; i < num; i++){
-          *(_pBuf+i) = _pWire->read();
-      }
-      left -=num;
-      _pBuf += num;
+    num = (left > IIC_BUFFER_SIZE) ?  IIC_BUFFER_SIZE : left;
+    _i2cdev->readBytesNoRegAddress(_addr, num, _pBuf);
+    left -=num;
+    _pBuf += num;
   }
+
   return (uint8_t)size;
 }
+
+/*
 void DFRobot_IICSerial::writeFIFO(void *pBuf, size_t size){
   if(pBuf == NULL){
-      DBG("pBuf ERROR!! : null pointer");
+      printf("pBuf ERROR!! : null pointer");
       return;
   }
+
   _addr = updateAddr(_addr, _subSerialChannel, OBJECT_FIFO);
   uint8_t *_pBuf = (uint8_t *)pBuf;
   size_t left = size;
+
   while(left){
-      size = (left > IIC_BUFFER_SIZE) ? IIC_BUFFER_SIZE: left;
-      _pWire->beginTransmission(_addr);
-      _pWire->write(_pBuf, size);
-      if(_pWire->endTransmission() != 0){
-          return;
-      }
-      delay(10);
-      left -= size;
-      _pBuf = _pBuf + size;
+    size = (left > IIC_BUFFER_SIZE) ? IIC_BUFFER_SIZE: left;
+    
+    _pWire->beginTransmission(_addr);
+    _pWire->write(_pBuf, size);
+    if(_pWire->endTransmission() != 0){
+        return;
+    }
+    
+    _i2cdev->writeBytes(_addr, reg, size, pBuf);
+    delay(10);
+    left -= size;
+    _pBuf = _pBuf + size;
   }
 }
+*/

@@ -17,23 +17,10 @@
 #ifndef __DFRobot_IICSERIAL_H
 #define __DFRobot_IICSERIAL_H
 
-#include <Arduino.h>
 #include <inttypes.h>
-#include "Stream.h"
-
-#if ARDUINO >= 100
-#include "Arduino.h"
-#else
-#include "WProgram.h"
-#endif
-#include <Wire.h>
-
-//Change 0 to 1 to open debug macro and check program debug information
-#if 0
-#define DBG(...) {Serial.print("["); Serial.print(__FUNCTION__); Serial.print("(): "); Serial.print(__LINE__); Serial.print(" ] "); Serial.println(__VA_ARGS__);}
-#else
-#define DBG(...)
-#endif
+#include <stddef.h>
+#include <cstddef>
+#include "I2Cdev.h"
 
 /*Global register*/
 #define REG_WK2132_GENA   0x00   //Global control register, control sub UART clock 
@@ -92,11 +79,8 @@ typedef uint16_t rx_buffer_index_t;
 typedef uint8_t rx_buffer_index_t;
 #endif
 
-#ifdef ARDUINO_ARCH_NRF5
-class DFRobot_IICSerial : public _Stream{
-#else
-class DFRobot_IICSerial : public Stream{
-#endif
+
+class DFRobot_IICSerial {
 public:
   #define ERR_OK                0
   #define ERR_REGDATA          -1
@@ -104,14 +88,7 @@ public:
   #define FOSC                 14745600L//External cystal frequency 14.7456MHz
   #define OBJECT_REGISTER      0x00     //Register object 
   #define OBJECT_FIFO          0x01     //FIFO buffer object 
-#ifdef ARDUINO_ARCH_NRF5
-  #define IIC_BUFFER_SIZE      63       //micro:bit IIC can transmit at most 63 bytes each time 
-#elif ARDUINO_ARCH_MPYTHON
-  #define IIC_BUFFER_SIZE      31       //mPython IIC can transmit at most 31 bytes each time 
-#else
   #define IIC_BUFFER_SIZE      32       //UNO, Mega2560, Leonardo(AVR series), IIC can transmit at most 32 bytes each time
-#endif
-
   typedef enum{
       eNormalMode = 0,
       //eIrDAMode
@@ -240,7 +217,7 @@ protected:
 public:
   /**
    * @brief Constructor
-   * @param pWire I2C bus pointer object, default Wire
+   * @param wire I2C bus pointer object, default I2Cdev
    * @param subUartChannel sub UART channel, WK2132 has two sub UARTs: SUBUART_CHANNEL_1 or SUBUART_CHANNEL_2
    * @Parameter IA1 corresponds with IA1 Level(0 or 1) of DIP switch on the module, and is used for configuring 
    * @n the IIC address of the 6th bit value(default: 1).
@@ -256,7 +233,7 @@ public:
    * @n The values of the 2nd and 1st bits are the sub UART channels, 00 for sub UART 1, 01 for sub UART 2. 
    * @n The 0 bit represents the operation object: 0 for register, 1 for FIFO cache.
    */
-  DFRobot_IICSerial(TwoWire &wire = Wire, uint8_t subUartChannel = SUBUART_CHANNEL_1, uint8_t IA1 = 1, uint8_t IA0 = 1);
+  DFRobot_IICSerial(I2Cdev &i2cdev, uint8_t subUartChannel = SUBUART_CHANNEL_1, uint8_t IA1 = 1, uint8_t IA0 = 1);
   ~DFRobot_IICSerial();
 
   /**
@@ -333,9 +310,9 @@ public:
    * @param size Length of the data to be read
    * @return Output the number of bytes
    */
-  virtual size_t write(const uint8_t *pBuf, size_t size);
-  using Print::write; /*!< pull in write(str) and write(buf, size) from Print */
-  operator bool() { return true; }
+  //virtual size_t write(const uint8_t *pBuf, size_t size);
+  //using Print::write; /*!< pull in write(str) and write(buf, size) from Print */
+  //operator bool() { return true; }
 
 protected:
   /**
@@ -471,7 +448,8 @@ protected:
 
 
 private:
-  TwoWire *_pWire;
+  //TwoWire *_pWire;
+  I2Cdev *_i2cdev;
   uint8_t _addr;
   uint8_t _subSerialChannel;
 };
