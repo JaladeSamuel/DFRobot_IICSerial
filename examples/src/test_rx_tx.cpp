@@ -1,15 +1,15 @@
 /*!
- * @file dataTxAndRx.ino
+ * @file test_rx_tx.cpp
  * @brief Receive and transmit data via UART. Read the data sent by TX pin via pin RX.
  * @n Experiment phenomenon: connect the TX to RX in Sub UART1 and UART2. Read the data sent by Sub UART and print it out.
  *
  * @copyright   Copyright (c) 2010 DFRobot Co.Ltd (https://www.dfrobot.com)
  * @licence     The MIT License (MIT)
- * @author [Arya](xue.peng@dfrobot.com)
+ * @author Onera
  * @version  V1.0
- * @date  2019-07-28
+ * @date  23/04/2021
  * @get from https://www.dfrobot.com
- * @url https://github.com/DFRobot/DFRobot_IICSerial
+ * fork : @url https://github.com/JaladeSamuel/DFRobot_IICSerial
  */
 #include <fcntl.h> 
 #include <stdio.h>
@@ -42,15 +42,11 @@
 //Wire --> lib arduino pour i2c
 I2Cdev i2cdev;
 DFRobot_IICSerial iicSerial1(i2cdev, /*subUartChannel =*/SUBUART_CHANNEL_1,/*IA1 = */1,/*IA0 = */1);//Construct UART1
-DFRobot_IICSerial iicSerial2(i2cdev, /*subUartChannel =*/SUBUART_CHANNEL_1,/*IA1 = */1,/*IA0 = */1);//Construct UART1
-
-//DFRobot_IICSerial iicSerial1;//Default constructor, UART1, IA1 = 1, IA0 = 1
-//DFRobot_IICSerial iicSerial2(i2cdev, /*subUartChannel =*/SUBUART_CHANNEL_2, /*IA1 = */1,/*IA0 = */1);//Construct UART2
+DFRobot_IICSerial iicSerial2(i2cdev, /*subUartChannel =*/SUBUART_CHANNEL_2,/*IA1 = */1,/*IA0 = */1);//Construct UART1
 
 uint8_t flag = 0;//A flag bit, judge whether to print the prompt information of UART1 and UART2.
 //if it is 0, print "UART1 receive data: " or "UART2 receive data: "
 void setup() {
-  //Serial.begin(115200);
   /*begin Init function, set band rate according to the selected crystal frequency.
   begin(long unsigned baud) Call the function, set sub UART band rate.
   default setting->Band rate: baud, data format：IIC_SERIAL_8N1, 8 bits data, no check mode, 1 bit stop bit.
@@ -63,16 +59,15 @@ void setup() {
   8 represents the number of data bit, N for no parity, Z for 0 parity, O for Odd parity, E for Even parity,
   F for 1 parity, 1 or 2 for the number of stop bit. Default IIC_SERIAL_8N1
   */
-  iicSerial1.begin(/*baud = */57600);/*UART1 init*/
-  iicSerial2.begin(/*baud = */57600);/*UART1 init*/
+  iicSerial1.begin(/*baud = */115200);/*UART1 init*/
+  iicSerial2.begin(/*baud = */115200);/*UART1 init*/
   //iicSerial1.begin(/*baud = */115200, /*format = */IIC_SERIAL_8N1);
 
   printf("\n+--------------------------------------------+\n");
-  printf("|  Connected UART1's TX pin to RX pin.       |\n");//Connect pin TX and RX of UART1 
+  printf("|  Connected UART1/2's TX pin to RX pin.       |\n");//Connect pin TX and RX of UART1 
   printf("|  UART1 send bytes : 123                    |\n");//UART1 transmit a uint8_t 123
   printf("|  UART2 send bytes : 99                     |\n");//UART2 transmit a uint8_t 99
   printf("+--------------------------------------------+\n");
-  printf("Serial to print UART1\n");//print the data received by UART1 and UART2
 }
 
 int main(void) {
@@ -80,32 +75,33 @@ int main(void) {
   while(true) {
     uint8_t c;
     iicSerial1.write(123);
-    if(iicSerial1.available()) {/*available return the number of byte in UART1 receive buffer, none- return 0*/
+    if(iicSerial1.available()) {//available return the number of byte in UART1 receive buffer, none- return 0
       flag = 0;
       while(iicSerial1.available()) {
         if(flag == 0) {
           printf("\nUART1 receive data: ");
           flag = 1;
         }
-        c = iicSerial1.read();/*Read data of UART1 receive buffer */
-        printf("%d",c);
+        c = iicSerial1.read();//Read data of UART1 receive buffer 
+        printf("%d ",c);
       }
     }
-
+  
     uint8_t c2;
     iicSerial2.write(99);
-    if(iicSerial2.available()) {/*available return the number of byte in UART2 receive buffer, none- return 0*/
+    if(iicSerial2.available()) {//available return the number of byte in UART2 receive buffer, none- return 0
       flag = 0;
       while(iicSerial2.available()) {
         if(flag == 0) {
           printf("\nUART2 receive data: ");
           flag = 1;
         }
-        c2 = iicSerial2.read();/*Read data of UART2 receive buffer */
-        printf("%d",c2);
+        c2 = iicSerial2.read();//Read data of UART2 receive buffer 
+        printf("%d ",c2);
+        c2 = 0;
       }
     }
-    usleep(100*1000);
+    usleep(10*1000);
   }
   return 0;
 }

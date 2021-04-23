@@ -65,19 +65,8 @@
 #define IICSerial_8F1    0x0E
 #define IICSerial_8F2    0x0F
 
-
-#if !defined(SERIAL_RX_BUFFER_SIZE)
-#if ((RAMEND - RAMSTART) < 1023)
-#define SERIAL_RX_BUFFER_SIZE 16
-#else
 #define SERIAL_RX_BUFFER_SIZE 32
-#endif
-#endif
-#if  (SERIAL_RX_BUFFER_SIZE>256)
-typedef uint16_t rx_buffer_index_t;
-#else
 typedef uint8_t rx_buffer_index_t;
-#endif
 
 
 class DFRobot_IICSerial {
